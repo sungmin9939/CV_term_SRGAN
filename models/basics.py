@@ -61,13 +61,13 @@ class ConvBlock(nn.Module):
         return x
 
 class Generator(nn.Module):
-    def __init__(self, opt):
+    def __init__(self):
         super().__init__()
         self.conv1 = nn.Conv2d(3, 64, 9, 1, 4)
         self.prelu1 = nn.PReLU()
         self.pre_conv = nn.Sequential(self.conv1, self.prelu1)
 
-        resi_layers = [ResidualBlock(64,64,3,1,1) for _ in range(opt.num_rblock)]
+        resi_layers = [ResidualBlock(64,64,3,1,1) for _ in range(16)]
         self.resi_blocks = nn.Sequential(*resi_layers)
 
 
@@ -87,9 +87,7 @@ class Generator(nn.Module):
         x = self.resi_blocks(x)
         x = self.post_conv(x)
         x += temp
-        print(x.shape)
         x = self.postblocks(x)
-        print(x.shape)
         x = self.conv3(x)
         return x
 
@@ -99,11 +97,32 @@ class Discriminator(nn.Module):
         super().__init__()
 
         self.conv1 = nn.Conv2d(3,64,3,1,1)
-        self.leaky = nn.LeakyReLU(0.1)
+        self.leaky = nn.LeakyReLU(0.2)
 
         self.pre_conv = nn.Sequential(self.conv1, self.leaky)
 
-        self.convB1 = ConvBlock(64,64,3,2,)
+        self.convB1 = ConvBlock(64,64,3,2,1,0.2)
+        self.convB2 = ConvBlock(64,128,3,1,1,0.2)
+        self.convB3 = ConvBlock(128,128,3,2,1,0.2)
+        self.convB4 = ConvBlock(128,256,3,1,1,0.2)
+        self.convB5 = ConvBlock(256,256,3,2,1,0.2)
+        self.convB6 = ConvBlock(256,512,3,1,1,0.2)
+        self.convB7 = ConvBlock(512,512,3,2,1,0.2)
+
+        list = [self.convB1,self.convB2,self.convB3,self.convB4,self.convB5,self.convB6,self.convB7]
+
+        self.conv_block = nn.Sequential(*list)
+        self.ln1 = nn.Linear(512*6*6,1024)
+        self.ln2 = nn.Linear(1024,1)
+
+    def forward(self, x):
+        x = self.pre_conv(x)
+        x = self.conv_block(x)
+        x = self.ln1(x.view(x.size(0), -1))
+        x = self.leaky(x)
+        x = self.ln2(x)
+        return torch.sigmoid(x)
+
 
 
 
